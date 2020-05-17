@@ -1,22 +1,40 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "displayable", menuName = "Empty Displayable", order = 1)]
-public class Displayable : ScriptableObject
-{
+namespace KirinoEngine {
+    [Serializable]
+    public class SpriteMapper {
+        //Left-Top Anchor and Pivot
+        public Vector2 pos = new Vector2(0, 0);
 
-    public string key
-	{
-		get
-		{
-			//use scriptable object filename as key
-			return name;
-		}
-	}
+        public Vector2 size = new Vector2(100, 100);
+        public Sprite sprite;
+    }
 
-	// replace prviouse displayable as showing new displayable with same tag
-	public string tag;
+    public class Displayable {
+        public Vector2 canvasSize;
 
-    public Sprite sprite;
+        // name can be Duplicated
+        public string name;
+        public Vector2 offset;
+
+        public List<SpriteMapper> spriteMappers = new List<SpriteMapper>();
+
+        // diffrent tag with same name will replace older sprite
+        public string tag;
+
+
+        public void Resize(float percentage) {
+            canvasSize *= percentage;
+
+            offset *= percentage;
+
+            foreach (var spriteMap in spriteMappers)
+            {
+                spriteMap.pos *= percentage;
+                spriteMap.size *= percentage;
+            }
+        }
+    }
 }

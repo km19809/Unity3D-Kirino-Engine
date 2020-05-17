@@ -1,59 +1,86 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
+﻿using System;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
 
-public class BackgroundDisplayer : MonoBehaviour {
+namespace KirinoEngine {
+    public class BackgroundDisplayer : MonoBehaviour {
+        // Enqueue `true` when a drawing coroutine starts,
+        // and dequeue when one ends.
+        private readonly Queue<bool> currentDrawingRoutine = new Queue<bool>();
 
-	public float dissolveSpeed = 1.0f;
-	Image m_backgroundDisplayer;
+        public float dissolveTime = 0.5f;
+        public Image m_backgroundDisplayer;
 
-	public bool isChanging{
-		get;
-		private set;
-	}
+        public Sprite CurrentSprite => m_backgroundDisplayer.sprite;
 
-	void Awake () {
-		m_backgroundDisplayer = GetComponent<Image>();	
-	}
 
-	public void ChangeBackground(Sprite newBackground)
-	{
-		VNLocator.displayableDisplayer.HideAll();
-		VNLocator.textDisplayer.HideDialogueHolder();
+        public bool IsDrawing => currentDrawingRoutine.Count > 0;
 
-		StopCoroutine("SwitchBackgroundSprite");
-		StartCoroutine("SwitchBackgroundSprite",newBackground);
-	}
+        protected virtual void Awake() {
+            m_backgroundDisplayer = GetComponent<Image>();
+        }
 
-	private IEnumerator SwitchBackgroundSprite(Sprite newBackground)
-	{
-		isChanging = true;
+        public void ChangeBackground(Sprite newBackground) {
+            VNController.displayableDisplayer.HideAll();
+            VNController.textDisplayer.HideDialogueHolder();
 
-		var lastTimeCheck = Time.time;
-		var estimatedTime = 1.0f/dissolveSpeed;
+            UpdateBackgroundSprite(newBackground,null);
+        }
 
-		while(lastTimeCheck + estimatedTime >= Time.time)
-		{
-			var color = m_backgroundDisplayer.color;
-			color.a -= Time.deltaTime * dissolveSpeed;
-			m_backgroundDisplayer.color = color;
-			yield return null;
-		}
+        public void UpdateBackgroundSprite(Sprite newSprite, Action onDissolveEnd) {
+            var prevImage = Instantiate(m_backgroundDisplayer, m_backgroundDisplayer.transform);
+            prevImage.name += "_prev";
 
-		m_backgroundDisplayer.sprite = newBackground;
+            m_backgroundDisplayer.sprite = newSprite;
 
-		lastTimeCheck = Time.time;
+            StartCoroutine(DissolveOutAndDestroy(prevImage));
+            StartCoroutine(DissolveIn(m_backgroundDisplayer, onDissolveEnd));
+        }
 
-		while(lastTimeCheck + estimatedTime >= Time.time)
-		{
-			var color = m_backgroundDisplayer.color;
-			color.a += Time.deltaTime * dissolveSpeed;
-			m_backgroundDisplayer.color = color;
-			yield return null;
-		}
-		
-		m_backgroundDisplayer.color = Color.white;
+        private IEnumerator DissolveIn(Image image, Action onDissolveEnd) {
+            currentDrawingRoutine.Enqueue(true);
 
-		isChanging = false;
-	}
+            var alpha = 0.0f;
+            image.SetTransparency(alpha);
+
+            var startTime = Time.time;
+
+            while (Time.time <= startTime + dissolveTime)
+            {
+                alpha += Time.deltaTime / dissolveTime;
+                image.SetTransparency(alpha);
+
+                yield return null;
+            }
+
+            image.SetTransparency(1.0f);
+
+            currentDrawingRoutine.Dequeue();
+
+            onDissolveEnd?.Invoke();
+        }
+
+        private IEnumerator DissolveOutAndDestroy(Image image) {
+            currentDrawingRoutine.Enqueue(true);
+
+            var alpha = 1.0f;
+            image.SetTransparency(alpha);
+
+            var startTime = Time.time;
+
+            while (Time.time <= startTime + dissolveTime)
+            {
+                alpha -= Time.deltaTime / dissolveTime;
+                image.SetTransparency(alpha);
+
+                yield return null;
+            }
+
+            currentDrawingRoutine.Dequeue();
+
+            Destroy(image.gameObject);
+        }
+    }
 }
